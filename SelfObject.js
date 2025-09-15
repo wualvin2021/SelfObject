@@ -1,6 +1,6 @@
 /*
-* Self object model written in JavaScript. 
-* Use of object inheritance, message passing, and slots.
+Self object model written in JavaScript.
+Use of object inheritance, message passing, and slots.
 */
 
 class SelfObject {
@@ -13,16 +13,18 @@ class SelfObject {
   }
 
   /*
-  evaluate — given an object, evaluate it and return the result.
-  If the object has a list of messages, the object copies itself,
-  sends the messages to the copy, and returns the last result.
+  evaluate — given an object, return the result of evaluating it.
+  If the object has a primitive value, return a copy of the object.
+  If it has a primitive function, call that function with the object and the parameter slot (if any) and return the result.
+  If it has messages, send those messages in order and return the result of the last message.
+  If none of these apply, return the object itself.
   */
   evaluate() {
     if (this.primitive !== null) {
       return this.copy(); // return copy with same primitive value
     }
     if (this.primitiveFn) {
-      return this.primitiveFn(this);
+      return this.primitiveFn(this, this.slots['parameter']);
     }
     if (this.messages.length > 0) {
       let currentObj = this.copy();
@@ -54,11 +56,7 @@ class SelfObject {
   }
 
   /*
-  sendAMessage —- given an object and a string, send the message to the object.
-  The object corresponding to the message
-  (I.e., in the slot with the same name as the message) is evaluated and returned.
-  If the object doesn’t directly have a slot with that name,
-  recursively look in the parent slots via a breadth-first search.
+  sendAMessage — breadth-first parent search
   */
   sendAMessage(name) {
     if (this.slots[name]) {
@@ -79,12 +77,8 @@ class SelfObject {
   }
 
   /*
-  sendAMessageWithParameters — given an object and a string and a second object (the “parameter”),
-  send the message to the first object, passing the second object as a
-  parameter to the message by setting the “parameter” slot on the object.
-  If the object doesn’t directly have a slot with that name,
-  recursively look in the parent slots via a breadth-first search.
- */
+  sendAMessageWithParameters — BFS + cycle protection
+  */
   sendAMessageWithParameters(name, paramObj) {
     if (this.slots[name]) {
       const target = this.slots[name].copy();
@@ -109,16 +103,15 @@ class SelfObject {
 
   /*
   assignSlot — given an object, a string, and an object,
-  set the slot in the first object named by the string to refer to the second object.
- */
+  assign the object to the slot named by the string.
+  */
   assignSlot(name, obj) {
     this.slots[name] = obj;
   }
 
   /*
-  makeParent — given an object and a string,
-  designate the slot named by the string (if it exists) as a parent slot.
- */
+  makeParent — given an object and a string, if the slot named by the string exists,
+  */
   makeParent(name) {
     if (this.slots[name]) {
       this.parents.add(name);
@@ -126,7 +119,8 @@ class SelfObject {
   }
 
   /*
-  assignParentSlot — given an object, a string, and an object, call assignSlot then makeParent.
+  assignParentSlot — given an object, a string, and an object,
+  makes that slot a parent.
   */
   assignParentSlot(name, obj) {
     this.assignSlot(name, obj);
@@ -134,9 +128,7 @@ class SelfObject {
   }
 
   /*
-  print — given an object, produce a printed representation of the object as a string.
-  Alternatively, you may implement draw,
-  which draws a graphical representation of the object.
+  print — return a string representation of the object.
   */
   print() {
     const slotNames = Object.keys(this.slots).join(", ");
