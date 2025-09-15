@@ -1,6 +1,6 @@
 /*
 * Self object model written in JavaScript. 
-*
+* Use of object inheritance, message passing, and slots.
 */
 
 class SelfObject {
@@ -12,7 +12,34 @@ class SelfObject {
     this.primitiveFn = null;// optional primitive function
   }
 
-  // Copy the object
+  /*
+evaluate — given an object, evaluate it and return the result.
+If the object has a list of messages, the object copies itself,
+sends the messages to the copy, and returns the last result.
+ */
+  evaluate() {
+    if (this.primitiveFn) {
+      return this.primitiveFn(this);
+    }
+    if (this.messages.length > 0) {
+      let currentObj = this.copy();
+      let result = null;
+      for (const msg of this.messages) {
+        result = currentObj.sendAMessage(msg);
+        if (result) {
+          currentObj = result;
+        } else {
+          throw new Error(`Message '${msg}' not found`);
+        }
+      }
+      return result;
+    }
+    return this;
+  }
+
+  /*
+  copy — given an object, return a copy of it
+   */
   copy() {
     const newObj = new SelfObject();
     newObj.slots = { ...this.slots };
@@ -21,25 +48,6 @@ class SelfObject {
     newObj.primitive = this.primitive;
     newObj.primitiveFn = this.primitiveFn;
     return newObj;
-  }
-
-  // Evaluate the object
-  evaluate() {
-    if (this.primitive !== null) {
-      return this.copy(); // primitive data
-    }
-    if (this.primitiveFn !== null) {
-      return this.primitiveFn(this.copy());
-    }
-    if (this.messages.length > 0) {
-      const copy = this.copy();
-      let result = copy;
-      for (const msg of copy.messages) {
-        result = copy.sendAMessage(msg);
-      }
-      return result;
-    }
-    return this; // default
   }
 
   // Send a message (lookup slot by name)
