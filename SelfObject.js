@@ -13,11 +13,14 @@ class SelfObject {
   }
 
   /*
-evaluate — given an object, evaluate it and return the result.
-If the object has a list of messages, the object copies itself,
-sends the messages to the copy, and returns the last result.
- */
+  evaluate — given an object, evaluate it and return the result.
+  If the object has a list of messages, the object copies itself,
+  sends the messages to the copy, and returns the last result.
+  */
   evaluate() {
+    if (this.primitive !== null) {
+      return this.copy(); // return copy with same primitive value
+    }
     if (this.primitiveFn) {
       return this.primitiveFn(this);
     }
@@ -39,7 +42,7 @@ sends the messages to the copy, and returns the last result.
 
   /*
   copy — given an object, return a copy of it
-   */
+  */
   copy() {
     const newObj = new SelfObject();
     newObj.slots = { ...this.slots };
@@ -50,81 +53,115 @@ sends the messages to the copy, and returns the last result.
     return newObj;
   }
 
-  // Send a message (lookup slot by name)
-  sendAMessage(name, visited = new Set()) {
+  /*
+  sendAMessage —- given an object and a string, send the message to the object.
+  The object corresponding to the message
+  (I.e., in the slot with the same name as the message) is evaluated and returned.
+  If the object doesn’t directly have a slot with that name,
+  recursively look in the parent slots via a breadth-first search.
+  */
+  sendAMessage(name) {
     if (this.slots[name]) {
       return this.slots[name].evaluate();
     }
-    visited.add(this);
-    for (const parentName of this.parents) {
-      const parent = this.slots[parentName];
-      if (parent && !visited.has(parent)) {
-        const result = parent.sendAMessage(name, visited);
-        if (result) return result;
+    let visited = new Set();
+    let queue = [...this.parents].map(p => this.slots[p]);
+    while (queue.length > 0) {
+      let current = queue.shift();
+      if (!current || visited.has(current)) continue;
+      visited.add(current);
+      if (current.slots[name]) {
+        return current.slots[name].evaluate();
       }
+      queue.push(...[...current.parents].map(p => current.slots[p]));
     }
     return null;
   }
 
-  // Send a message with a parameter
+  /*
+  sendAMessageWithParameters — given an object and a string and a second object (the “parameter”),
+  send the message to the first object, passing the second object as a
+  parameter to the message by setting the “parameter” slot on the object.
+  If the object doesn’t directly have a slot with that name,
+  recursively look in the parent slots via a breadth-first search.
+ */
   sendAMessageWithParameters(name, paramObj) {
     if (this.slots[name]) {
       const target = this.slots[name].copy();
       target.slots["parameter"] = paramObj;
       return target.evaluate();
     }
-    for (const parentName of this.parents) {
-      const parent = this.slots[parentName];
-      const result = parent?.sendAMessageWithParameters(name, paramObj);
-      if (result) return result;
+    let visited = new Set();
+    let queue = [...this.parents].map(p => this.slots[p]);
+    while (queue.length > 0) {
+      let current = queue.shift();
+      if (!current || visited.has(current)) continue;
+      visited.add(current);
+      if (current.slots[name]) {
+        const target = current.slots[name].copy();
+        target.slots["parameter"] = paramObj;
+        return target.evaluate();
+      }
+      queue.push(...[...current.parents].map(p => current.slots[p]));
     }
     return null;
   }
 
-  // Assign slot
+  /*
+  assignSlot — given an object, a string, and an object,
+  set the slot in the first object named by the string to refer to the second object.
+ */
   assignSlot(name, obj) {
     this.slots[name] = obj;
   }
 
-  // Make slot a parent
+  /*
+  makeParent — given an object and a string,
+  designate the slot named by the string (if it exists) as a parent slot.
+ */
   makeParent(name) {
     if (this.slots[name]) {
       this.parents.add(name);
     }
   }
 
-  // Assign and make parent
+  /*
+  assignParentSlot — given an object, a string, and an object, call assignSlot then makeParent.
+  */
   assignParentSlot(name, obj) {
     this.assignSlot(name, obj);
     this.makeParent(name);
   }
 
-  // Print representation
+  /*
+  print — given an object, produce a printed representation of the object as a string.
+  Alternatively, you may implement draw,
+  which draws a graphical representation of the object.
+  */
   print() {
-    return JSON.stringify({
-      slots: Object.keys(this.slots),
-      parents: [...this.parents],
-      primitive: this.primitive,
-      hasMessages: this.messages.length > 0,
-      hasPrimitiveFn: this.primitiveFn !== null
-    }, null, 2);
+    const slotNames = Object.keys(this.slots).join(", ");
+    const parentNames = Array.from(this.parents).join(", ");
+    const messages = this.messages.join(", ");
+    return `SelfObject(primitive: ${this.primitive}, slots: {${slotNames}}, parents: {${parentNames}}, messages: [${messages}])`;
   }
 }
 
 // Example usage
-const numberObj = new SelfObject();
-numberObj.primitive = 5;
+const objA = new SelfObject();
+objA.primitive = "I am A";
 
-const addOne = new SelfObject();
-addOne.primitiveFn = (self) => {
-  const param = self.slots["parameter"];
-  const result = new SelfObject();
-  result.primitive = param.primitive + 1;
-  return result;
-};
+const objB = new SelfObject();
+objB.primitive = "I am B";
 
-numberObj.assignSlot("increment", addOne);
+const objC = new SelfObject();
+objC.primitive = "I am C";
 
-const result = numberObj.sendAMessageWithParameters("increment", numberObj);
-console.log("Result:", result.primitive); // 6
+objA.assignSlot("b", objB);
+objA.assignParentSlot("c", objC);
 
+objA.messages.push("b");
+objA.messages.push("c");
+
+const result = objA.evaluate();
+console.log(result.print());      // should show objC
+console.log(result.primitive);    // "I am C"
